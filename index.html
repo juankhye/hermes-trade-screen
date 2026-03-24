@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermès (RMS FP) — Leading Indicator Trade Screen</title>
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&f[]=cabinet-grotesk@700,800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+<style>
+/* ========== RESET & BASE ========== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-primary:#0d1117;
+  --bg-secondary:#161b22;
+  --bg-card:#1c2128;
+  --bg-card-hover:#21262d;
+  --border:#30363d;
+  --border-light:#484f58;
+  --text-primary:#e6edf3;
+  --text-secondary:#8b949e;
+  --text-muted:#6e7681;
+  --accent:#c9a96e;
+  --accent-dim:#8a7244;
+  --accent-cream:#e8dcc8;
+  --accent-blue:#58a6ff;
+  --accent-teal:#2dd4bf;
+  --green:#3fb950;
+  --green-dim:#238636;
+  --red:#f85149;
+  --red-dim:#da3633;
+  --amber:#d29922;
+  --amber-dim:#9e6a03;
+  --font-body:'General Sans',system-ui,-apple-system,sans-serif;
+  --font-heading:'Cabinet Grotesk','General Sans',system-ui,sans-serif;
+  --radius:8px;
+  --radius-lg:12px;
+  --shadow:0 2px 8px rgba(0,0,0,.3);
+  --transition:150ms ease;
+}
+html{font-size:14px;scroll-behavior:smooth}
+body{font-family:var(--font-body);background:var(--bg-primary);color:var(--text-primary);line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4,h5{font-family:var(--font-heading);font-weight:700;line-height:1.2}
+a{color:var(--accent-teal);text-decoration:none}
+a:hover{text-decoration:underline}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:var(--bg-primary)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--border-light)}
+
+/* ========== NAVIGATION ========== */
+.nav{position:sticky;top:0;z-index:100;background:rgba(13,17,23,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 24px}
+.nav-inner{max-width:1440px;margin:0 auto;display:flex;align-items:center;gap:8px;height:52px;overflow-x:auto}
+.nav-logo{font-family:var(--font-heading);font-size:1.1rem;color:var(--accent);white-space:nowrap;margin-right:16px;display:flex;align-items:center;gap:8px}
+.nav-logo svg{width:20px;height:20px;fill:var(--accent)}
+.nav-tab{padding:8px 16px;font-size:.85rem;font-weight:500;color:var(--text-secondary);cursor:pointer;border-radius:6px;white-space:nowrap;transition:all var(--transition);border:none;background:none;font-family:var(--font-body)}
+.nav-tab:hover{color:var(--text-primary);background:var(--bg-card)}
+.nav-tab.active{color:var(--accent);background:rgba(201,169,110,.1)}
+.nav-tab .tab-num{font-size:.7rem;opacity:.5;margin-right:4px}
+
+/* ========== LAYOUT ========== */
+.main{max-width:1440px;margin:0 auto;padding:24px}
+.section{display:none;animation:fadeIn .3s ease}
+.section.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ========== HEADER BAR ========== */
+.header-bar{display:flex;align-items:center;gap:16px;padding:16px 20px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:24px;flex-wrap:wrap}
+.header-bar .stock-name{font-family:var(--font-heading);font-size:1.4rem;color:var(--accent)}
+.header-bar .stock-price{font-size:1.6rem;font-weight:700;font-variant-numeric:tabular-nums}
+.header-bar .stock-change{font-size:.9rem;font-weight:600;padding:3px 10px;border-radius:4px}
+.header-bar .stock-change.up{background:rgba(63,185,80,.15);color:var(--green)}
+.header-bar .stock-change.down{background:rgba(248,81,73,.15);color:var(--red)}
+.header-bar .meta{font-size:.8rem;color:var(--text-secondary)}
+.header-bar .meta strong{color:var(--text-primary)}
+.header-bar .signal-badge{font-size:.75rem;font-weight:700;padding:4px 12px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px}
+.signal-strong{background:rgba(63,185,80,.15);color:var(--green)}
+.signal-neutral{background:rgba(210,153,34,.15);color:var(--amber)}
+.signal-weak{background:rgba(248,81,73,.15);color:var(--red)}
+
+/* ========== CARDS ========== */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;transition:border-color var(--transition)}
+.card:hover{border-color:var(--border-light)}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-family:var(--font-heading);font-size:1.1rem;color:var(--text-primary)}
+.card-badge{font-size:.7rem;padding:3px 8px;border-radius:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.badge-gold{background:rgba(201,169,110,.15);color:var(--accent)}
+.badge-teal{background:rgba(45,212,191,.15);color:var(--accent-teal)}
+.badge-green{background:rgba(63,185,80,.15);color:var(--green)}
+.badge-red{background:rgba(248,81,73,.15);color:var(--red)}
+.badge-amber{background:rgba(210,153,34,.15);color:var(--amber)}
+
+/* ========== GRID ========== */
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+@media(max-width:1200px){.grid-4,.grid-5{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:900px){.grid-2,.grid-3,.grid-4,.grid-5{grid-template-columns:1fr}}
+@media(max-width:768px){.nav-tab{padding:6px 10px;font-size:.8rem}}
+
+/* ========== SECTION HEADERS ========== */
+.section-header{margin-bottom:24px}
+.section-header h2{font-size:1.8rem;color:var(--text-primary);margin-bottom:4px}
+.section-header p{color:var(--text-secondary);font-size:.95rem}
+.subsection{margin-bottom:32px}
+.subsection-title{font-family:var(--font-heading);font-size:1.25rem;color:var(--accent);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.subsection-title::before{content:'';display:inline-block;width:4px;height:20px;background:var(--accent);border-radius:2px}
+
+/* ========== METRIC CARDS ========== */
+.metric-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:all .2s ease}
+.metric-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.metric-card h4{font-size:.75rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.metric-card .metric-value{font-size:1.5rem;font-weight:700;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.metric-card .metric-sub{font-size:.8rem;color:var(--text-secondary);margin-top:4px}
+.metric-card .metric-delta{font-size:.8rem;font-weight:600;margin-top:4px}
+.metric-delta.up{color:var(--green)}
+.metric-delta.down{color:var(--red)}
+.metric-delta.flat{color:var(--amber)}
+
+/* ========== SIGNAL CARDS ========== */
+.signal-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;position:relative;overflow:hidden}
+.signal-card::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;border-radius:2px 0 0 2px}
+.signal-card.sig-green::before{background:var(--green)}
+.signal-card.sig-amber::before{background:var(--amber)}
+.signal-card.sig-red::before{background:var(--red)}
+.signal-card .sig-label{font-size:.75rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.signal-card .sig-value{font-size:1.8rem;font-weight:700;font-variant-numeric:tabular-nums}
+.signal-card .sig-status{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:8px;padding:3px 8px;border-radius:4px;display:inline-block}
+
+/* ========== TABLES ========== */
+.data-table{width:100%;border-collapse:collapse;font-size:.8rem;font-variant-numeric:tabular-nums}
+.data-table th{background:var(--bg-secondary);color:var(--text-secondary);font-weight:600;text-transform:uppercase;font-size:.7rem;letter-spacing:.5px;padding:10px 12px;text-align:left;border-bottom:2px solid var(--border);white-space:nowrap}
+.data-table td{padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap}
+.data-table tr:hover td{background:var(--bg-card-hover)}
+.data-table .positive{color:var(--green)}
+.data-table .negative{color:var(--red)}
+
+/* ========== CHART CONTAINERS ========== */
+.chart-container{position:relative;width:100%;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+.chart-container canvas{width:100%!important}
+.chart-container h3{font-family:var(--font-heading);font-size:1rem;color:var(--text-primary);margin-bottom:12px}
+
+/* ========== VALUE CHAIN ========== */
+.value-chain{display:flex;align-items:center;gap:0;overflow-x:auto;padding:20px 0}
+.chain-step{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;min-width:140px;text-align:center;transition:all .2s ease}
+.chain-step:hover{border-color:var(--accent);transform:translateY(-3px)}
+.chain-step .step-icon{font-size:1.5rem;margin-bottom:8px}
+.chain-step .step-name{font-weight:600;font-size:.85rem;margin-bottom:4px}
+.chain-step .step-detail{font-size:.7rem;color:var(--text-secondary)}
+.chain-arrow{color:var(--text-muted);font-size:1.2rem;flex-shrink:0;padding:0 4px}
+
+/* ========== TIMELINE ========== */
+.timeline{position:relative;padding-left:32px}
+.timeline::before{content:'';position:absolute;left:12px;top:0;bottom:0;width:2px;background:var(--border)}
+.timeline-item{position:relative;margin-bottom:24px;padding-left:16px}
+.timeline-item::before{content:'';position:absolute;left:-24px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-primary)}
+.timeline-date{font-size:.75rem;color:var(--accent);font-weight:600;margin-bottom:4px}
+.timeline-content{font-size:.85rem;color:var(--text-secondary);line-height:1.6}
+
+/* ========== RISK CARDS ========== */
+.risk-card{border-radius:var(--radius);padding:16px;border:1px solid}
+.risk-card.risk-green{background:rgba(63,185,80,.05);border-color:rgba(63,185,80,.3)}
+.risk-card.risk-amber{background:rgba(210,153,34,.05);border-color:rgba(210,153,34,.3)}
+.risk-card.risk-red{background:rgba(248,81,73,.05);border-color:rgba(248,81,73,.3)}
+.risk-card h4{font-size:.9rem;margin-bottom:8px}
+.risk-card p{font-size:.8rem;color:var(--text-secondary);line-height:1.5}
+.risk-level{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.risk-level.green{color:var(--green)}
+.risk-level.amber{color:var(--amber)}
+.risk-level.red{color:var(--red)}
+
+/* ========== THESIS CARD ========== */
+.thesis-item{display:flex;align-items:flex-start;gap:12px;padding:12px;border-bottom:1px solid var(--border)}
+.thesis-item:last-child{border-bottom:none}
+.thesis-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0}
+.thesis-num.bull{background:rgba(63,185,80,.15);color:var(--green)}
+.thesis-num.bear{background:rgba(248,81,73,.15);color:var(--red)}
+.thesis-text{font-size:.85rem;line-height:1.5}
+.thesis-text strong{color:var(--text-primary)}
+
+/* ========== SCORE GAUGE ========== */
+.score-ring{position:relative;width:120px;height:120px;margin:0 auto}
+.score-ring svg{width:120px;height:120px;transform:rotate(-90deg)}
+.score-ring .bg{fill:none;stroke:var(--border);stroke-width:8}
+.score-ring .fg{fill:none;stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset .8s ease}
+.score-ring .score-label{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.score-ring .score-num{font-size:1.8rem;font-weight:700;font-variant-numeric:tabular-nums;display:block}
+.score-ring .score-text{font-size:.65rem;color:var(--text-secondary);text-transform:uppercase}
+
+/* ========== HEATMAP ========== */
+.heatmap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:4px}
+.heatmap-cell{padding:10px 8px;border-radius:4px;text-align:center;font-size:.75rem;font-weight:600;transition:transform .15s}
+.heatmap-cell:hover{transform:scale(1.05)}
+.heatmap-cell .cell-label{font-size:.6rem;color:rgba(255,255,255,.7);display:block;margin-bottom:2px}
+
+/* ========== LOADING ========== */
+.loading{display:flex;align-items:center;gap:8px;color:var(--text-muted);font-size:.8rem;padding:12px}
+.loading::before{content:'';width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ========== FOOTER ========== */
+.footer{text-align:center;padding:32px 24px;color:var(--text-muted);font-size:.75rem;border-top:1px solid var(--border);margin-top:48px}
+</style>
+</head>
+<body>
+
+<!-- ========== NAVIGATION ========== -->
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-logo">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      Hermès Trade Screen
+    </div>
+    <button class="nav-tab active" data-tab="overview"><span class="tab-num">01</span> Hermès 101</button>
+    <button class="nav-tab" data-tab="demand"><span class="tab-num">02</span> Demand Pulse</button>
+    <button class="nav-tab" data-tab="resale"><span class="tab-num">03</span> Resale Market</button>
+    <button class="nav-tab" data-tab="china"><span class="tab-num">04</span> China Consumer</button>
+    <button class="nav-tab" data-tab="tourist"><span class="tab-num">05</span> Tourist & GCC</button>
+    <button class="nav-tab" data-tab="sector"><span class="tab-num">06</span> Sector & Peers</button>
+    <button class="nav-tab" data-tab="thesis"><span class="tab-num">07</span> Supply & Thesis</button>
+  </div>
+</nav>
+
+<!-- ========== HEADER BAR ========== -->
+<div class="main">
+  <div class="header-bar">
+    <div class="stock-name">Hermès International (RMS FP)</div>
+    <div class="stock-price" id="live-price">--</div>
+    <div class="stock-change" id="live-change">--</div>
+    <div class="meta">Mkt Cap: <strong id="live-mcap">--</strong></div>
+    <div class="meta">Next Earnings: <strong>Apr 15, 2026</strong></div>
+    <div class="meta">52W Range: <strong>€1,656 – €2,606</strong></div>
+    <div class="signal-badge signal-neutral" id="composite-signal">COMPOSITE: --</div>
+    <div class="meta" style="margin-left:auto;font-size:.7rem" id="last-updated">Loading...</div>
+  </div>
+
+<!-- ====================================================================== -->
+<!-- TAB 1: HERMÈS 101 -->
+<!-- ====================================================================== -->
+<div id="overview" class="section active">
+  <div class="section-header">
+    <h2>Hermès 101</h2>
+    <p>Company overview, financials, and business model</p>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="grid-5 subsection">
+    <div class="metric-card">
+      <h4>FY25 Revenue</h4>
+      <div class="metric-value">€16.0B</div>
+      <div class="metric-delta up">+8.9% CER</div>
+    </div>
+    <div class="metric-card">
+      <h4>FY25 EBIT Margin</h4>
+      <div class="metric-value">41.1%</div>
+      <div class="metric-delta up">+50bps YoY</div>
+    </div>
+    <div class="metric-card">
+      <h4>FY25 Gross Margin</h4>
+      <div class="metric-value">71.1%</div>
+      <div class="metric-delta up">+80bps YoY</div>
+    </div>
+    <div class="metric-card">
+      <h4>Net Cash</h4>
+      <div class="metric-value">€12.8B</div>
+      <div class="metric-sub">Fortress balance sheet</div>
+    </div>
+    <div class="metric-card">
+      <h4>LG Vol Growth Cap</h4>
+      <div class="metric-value">6-7%</div>
+      <div class="metric-sub">Annual through 2030</div>
+    </div>
+  </div>
+
+  <!-- Revenue by Segment -->
+  <div class="subsection">
+    <div class="subsection-title">Revenue by Segment (FY25)</div>
+    <div class="grid-2">
+      <div class="chart-container">
+        <canvas id="chart-segment"></canvas>
+      </div>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr><th>Segment</th><th>FY25 Rev</th><th>% Share</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Leather Goods & Saddlery</td><td>€7,063M</td><td>44%</td><td>Birkin & Kelly ~25-33% of sales/profit</td></tr>
+            <tr><td>Ready-to-Wear & Accessories</td><td>€4,481M</td><td>28%</td><td>Footwear, belts, fashion accessories</td></tr>
+            <tr><td>Other Hermès Sectors</td><td>€2,080M</td><td>13%</td><td>Jewelry, home (Art of Living)</td></tr>
+            <tr><td>Silk & Textiles</td><td>€960M</td><td>6%</td><td>Iconic scarves and ties</td></tr>
+            <tr><td>Watches</td><td>€640M</td><td>4%</td><td>Expanding high-end timepieces</td></tr>
+            <tr><td>Perfume & Beauty</td><td>€480M</td><td>3%</td><td>New cosmetics/skincare launching</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Revenue by Geography -->
+  <div class="subsection">
+    <div class="subsection-title">Revenue by Geography</div>
+    <div class="grid-2">
+      <div class="chart-container">
+        <canvas id="chart-geo"></canvas>
+      </div>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr><th>Region</th><th>FY25</th><th>CER Growth</th><th>1Q26e</th><th>FY26e</th></tr></thead>
+          <tbody>
+            <tr><td>APAC ex-Japan</td><td>€6,702M</td><td class="positive">+5%</td><td class="positive">+6%</td><td class="positive">+7%</td></tr>
+            <tr><td>Americas</td><td>€3,075M</td><td class="positive">+12%</td><td class="positive">+15%</td><td class="positive">+13%</td></tr>
+            <tr><td>Europe ex-France</td><td>€2,362M</td><td class="positive">+11%</td><td class="positive">+9%</td><td class="positive">+10%</td></tr>
+            <tr><td>Japan</td><td>€1,591M</td><td class="positive">+14%</td><td class="positive">+11%</td><td class="positive">+12%</td></tr>
+            <tr><td>France</td><td>€1,575M</td><td class="positive">+9%</td><td class="positive">+2%</td><td class="positive">+6%</td></tr>
+            <tr><td>Others</td><td>€697M</td><td class="positive">+15%</td><td class="negative">-4%</td><td class="positive">+4%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Consensus Estimates -->
+  <div class="subsection">
+    <div class="subsection-title">Consensus Estimates (Visible Alpha, Mar 20 2026)</div>
+    <div class="card">
+      <table class="data-table">
+        <thead><tr><th>Metric</th><th>FY25A</th><th>FY26e</th><th>FY27e</th><th>FY28e</th><th>MS FY26e</th><th>Bernstein FY26e</th></tr></thead>
+        <tbody>
+          <tr><td>Revenue (€M)</td><td>16,002</td><td>17,123</td><td>18,833</td><td>20,653</td><td>17,089</td><td>--</td></tr>
+          <tr><td>Organic Growth (%)</td><td>+8.9%</td><td>+9.5%</td><td>+9.6%</td><td>+9.6%</td><td>+8.9%</td><td>--</td></tr>
+          <tr><td>EBIT (€M)</td><td>6,569</td><td>6,942</td><td>7,643</td><td>8,408</td><td>6,951</td><td>--</td></tr>
+          <tr><td>EBIT Margin</td><td>41.1%</td><td>40.6%</td><td>40.6%</td><td>40.7%</td><td>40.7%</td><td>--</td></tr>
+          <tr><td>EPS (€)</td><td>39.84</td><td>45.8</td><td>52.8</td><td>59.0</td><td>46.3</td><td>45.66</td></tr>
+          <tr><td>P/E (at €1,656)</td><td>41.6x</td><td>36.2x</td><td>31.4x</td><td>28.1x</td><td>35.8x</td><td>36.3x</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Business Model / Value Chain -->
+  <div class="subsection">
+    <div class="subsection-title">Business Model: The Scarcity Engine</div>
+    <div class="value-chain">
+      <div class="chain-step"><div class="step-icon">🐄</div><div class="step-name">Raw Hides</div><div class="step-detail">75% vertically integrated</div></div>
+      <div class="chain-arrow">→</div>
+      <div class="chain-step"><div class="step-icon">🏭</div><div class="step-name">Ateliers</div><div class="step-detail">60 workshops, France</div></div>
+      <div class="chain-arrow">→</div>
+      <div class="chain-step"><div class="step-icon">👤</div><div class="step-name">Single Artisan</div><div class="step-detail">"One man, one bag"</div></div>
+      <div class="chain-arrow">→</div>
+      <div class="chain-step"><div class="step-icon">⏳</div><div class="step-name">2-Year Training</div><div class="step-detail">+ 1-year internship</div></div>
+      <div class="chain-arrow">→</div>
+      <div class="chain-step"><div class="step-icon">🏪</div><div class="step-name">Boutiques</div><div class="step-detail">Exclusive distribution</div></div>
+      <div class="chain-arrow">→</div>
+      <div class="chain-step"><div class="step-icon">📋</div><div class="step-name">Waitlist</div><div class="step-detail">Strategic scarcity</div></div>
+      <div class="chain-arrow">→</div>
+      <div class="chain-step"><div class="step-icon">💎</div><div class="step-name">Zero Markdown</div><div class="step-detail">5-6% annual pricing</div></div>
+    </div>
+    <div class="grid-3" style="margin-top:16px">
+      <div class="card" style="border-left:3px solid var(--accent)">
+        <h4 style="color:var(--accent);margin-bottom:8px">Pricing Power</h4>
+        <p style="font-size:.85rem;color:var(--text-secondary)">5-6% global price increases annually without consumer resistance. FY26 guidance: +5-6% pricing + 6-7% volumes. May 2025: extra 4-5% US price hike for tariffs.</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--accent-teal)">
+        <h4 style="color:var(--accent-teal);margin-bottom:8px">Supply Discipline</h4>
+        <p style="font-size:.85rem;color:var(--text-secondary)">Leather goods volume capped at 6-7% growth annually through 2030. New ateliers: Loupes (2026), Charleville-Mézières (2027), Colombelles (2028), Les Andelys (2030).</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--accent-cream)">
+        <h4 style="color:var(--accent-cream);margin-bottom:8px">Ownership</h4>
+        <p style="font-size:.85rem;color:var(--text-secondary)">Hermès family: 67% capital, 76% voting rights via H51 SAS. Free float ~33%. Led by Axel Dumas (6th gen). "Democratic monarchy" structure.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key Dates -->
+  <div class="subsection">
+    <div class="subsection-title">Key Dates & Catalysts</div>
+    <div class="timeline">
+      <div class="timeline-item"><div class="timeline-date">Apr 15, 2026</div><div class="timeline-content"><strong>Q1 2026 Revenue Report</strong> — 8 AM CET, call at 9 AM. Consensus: +9.5% organic. MS est: +7.4%.</div></div>
+      <div class="timeline-item"><div class="timeline-date">H1 2026</div><div class="timeline-content"><strong>Loupes Atelier Opening</strong> — New leather goods workshop, +6-7% capacity.</div></div>
+      <div class="timeline-item"><div class="timeline-date">Jan 2027</div><div class="timeline-content"><strong>Grace Wales Bonner Menswear Collection</strong> — First collection under new creative director.</div></div>
+      <div class="timeline-item"><div class="timeline-date">2027</div><div class="timeline-content"><strong>Haute Couture Launch</strong> — New business line. Charleville-Mézières atelier opens.</div></div>
+      <div class="timeline-item"><div class="timeline-date">2027-2028</div><div class="timeline-content"><strong>Cosmetics/Skincare Expansion</strong> — Eye care and comprehensive skincare range.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- TAB 2: DEMAND PULSE -->
+<!-- ====================================================================== -->
+<div id="demand" class="section">
+  <div class="section-header">
+    <h2>Demand Pulse</h2>
+    <p>Real-time search trends, brand interest, and composite demand scoring</p>
+  </div>
+
+  <!-- Demand Score Cards -->
+  <div class="grid-4 subsection" id="demand-signals">
+    <div class="signal-card sig-amber">
+      <div class="sig-label">Composite Demand Score</div>
+      <div class="score-ring">
+        <svg><circle class="bg" cx="60" cy="60" r="50"/><circle class="fg" cx="60" cy="60" r="50" stroke="var(--amber)" id="demand-score-ring"/></svg>
+        <div class="score-label"><span class="score-num" id="demand-score-num">--</span><span class="score-text">/ 100</span></div>
+      </div>
+    </div>
+    <div class="signal-card sig-amber" id="sig-search">
+      <div class="sig-label">Google Search Momentum</div>
+      <div class="sig-value" id="sig-search-val">--</div>
+      <div class="sig-status" style="background:rgba(210,153,34,.15);color:var(--amber)">Loading</div>
+    </div>
+    <div class="signal-card sig-amber" id="sig-aspirational">
+      <div class="sig-label">Aspirational Demand</div>
+      <div class="sig-value" id="sig-asp-val">--</div>
+      <div class="sig-status" style="background:rgba(210,153,34,.15);color:var(--amber)">Loading</div>
+      <div style="font-size:.7rem;color:var(--text-muted);margin-top:6px">"Hermès gift", "Hermès scarf" trends</div>
+    </div>
+    <div class="signal-card sig-amber" id="sig-web">
+      <div class="sig-label">Web Traffic (hermes.com)</div>
+      <div class="sig-value" id="sig-web-val">--</div>
+      <div class="sig-status" style="background:rgba(210,153,34,.15);color:var(--amber)">Loading</div>
+      <div style="font-size:.7rem;color:var(--text-muted);margin-top:6px">SimilarWeb estimate</div>
+    </div>
+  </div>
+
+  <!-- Google Trends Charts -->
+  <div class="subsection">
+    <div class="subsection-title">Google Trends — Core Brand Interest (12M)</div>
+    <div class="chart-container" style="height:350px">
+      <canvas id="chart-trends-core"></canvas>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Google Trends — Aspirational / Entry-Level (12M)</div>
+    <div class="grid-2">
+      <div class="chart-container" style="height:300px">
+        <canvas id="chart-trends-aspirational"></canvas>
+      </div>
+      <div class="card">
+        <h4 style="color:var(--accent);margin-bottom:12px">Why Aspirational Demand Matters</h4>
+        <p style="font-size:.85rem;color:var(--text-secondary);line-height:1.7">
+          Morgan Stanley's key headwind #1: <strong style="color:var(--red)">middle-income consumer softness</strong>. Unlike Chanel or Loro Piana, Hermès has a sizeable gifting/entry-price business (ties, scarves, sandals, jewelry) catering to aspirational customers.
+        </p>
+        <p style="font-size:.85rem;color:var(--text-secondary);line-height:1.7;margin-top:12px">
+          Tracking search volume for "Hermès gift", "Hermès scarf", and "Hermès sandals" provides a real-time proxy for this aspirational demand layer. A decline here while core "Birkin" searches hold is a classic <strong style="color:var(--amber)">mixed signal</strong>.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Baidu Index -->
+  <div class="subsection">
+    <div class="subsection-title">Baidu Search Index — "爱马仕" (China)</div>
+    <div class="chart-container" style="height:300px">
+      <canvas id="chart-baidu"></canvas>
+    </div>
+    <p style="font-size:.75rem;color:var(--text-muted);margin-top:8px">Source: akshare / Baidu Index. Updated via GitHub Actions.</p>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- TAB 3: RESALE MARKET -->
+<!-- ====================================================================== -->
+<div id="resale" class="section">
+  <div class="section-header">
+    <h2>Resale Market Tracker</h2>
+    <p>Birkin/Kelly resale premiums as a proxy for brand desirability and pre-spend ratio</p>
+  </div>
+
+  <!-- Resale KPIs -->
+  <div class="grid-4 subsection">
+    <div class="signal-card sig-amber">
+      <div class="sig-label">Birkin 30 Avg Resale</div>
+      <div class="sig-value">€12,400</div>
+      <div class="sig-status" style="background:rgba(210,153,34,.15);color:var(--amber)">NEUTRAL</div>
+    </div>
+    <div class="signal-card sig-red">
+      <div class="sig-label">Resale Premium (vs Retail)</div>
+      <div class="sig-value">1.35x</div>
+      <div class="metric-delta down" style="margin-top:4px">Was 2.2x in 2022</div>
+      <div class="sig-status" style="background:rgba(248,81,73,.15);color:var(--red)">DECLINING</div>
+    </div>
+    <div class="signal-card sig-amber">
+      <div class="sig-label">Avg Days on Market</div>
+      <div class="sig-value">18d</div>
+      <div class="sig-status" style="background:rgba(210,153,34,.15);color:var(--amber)">STABLE</div>
+    </div>
+    <div class="signal-card sig-amber">
+      <div class="sig-label">New Listings (30d)</div>
+      <div class="sig-value">+12%</div>
+      <div class="sig-status" style="background:rgba(210,153,34,.15);color:var(--amber)">WATCH</div>
+    </div>
+  </div>
+
+  <!-- Resale Premium Over Time -->
+  <div class="subsection">
+    <div class="subsection-title">Birkin Resale Premium vs Retail (2020-2026)</div>
+    <div class="chart-container" style="height:350px">
+      <canvas id="chart-resale-premium"></canvas>
+    </div>
+    <div class="card" style="margin-top:16px;border-left:3px solid var(--red)">
+      <h4 style="color:var(--red);margin-bottom:8px">Key Insight: Pre-Spend Ratio Erosion</h4>
+      <p style="font-size:.85rem;color:var(--text-secondary);line-height:1.7">Bernstein notes that Birkin resale premiums fell from ~2.2x retail in 2022 to ~1.4x by late 2025. If this continues toward 1.0x, the "quota tax" (mandatory pre-spend on scarves/RTW to qualify for a Birkin allocation) becomes harder to justify, structurally undermining the pre-spend flywheel that drives ~30% of revenue.</p>
+    </div>
+  </div>
+
+  <!-- Resale by Model -->
+  <div class="subsection">
+    <div class="subsection-title">Resale Prices by Model</div>
+    <div class="chart-container" style="height:350px">
+      <canvas id="chart-resale-models"></canvas>
+    </div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="subsection">
+    <div class="subsection-title">Resale Premium Heatmap (Model x Leather)</div>
+    <div class="card">
+      <div class="heatmap-grid" id="resale-heatmap"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- TAB 4: CHINA CONSUMER -->
+<!-- ====================================================================== -->
+<div id="china" class="section">
+  <div class="section-header">
+    <h2>China Consumer Tracker</h2>
+    <p>Chinese national spending, consumer confidence, and Hainan duty-free as luxury demand proxies</p>
+  </div>
+
+  <!-- China KPIs -->
+  <div class="grid-5 subsection">
+    <div class="metric-card">
+      <h4>China CCI</h4>
+      <div class="metric-value" id="china-cci">--</div>
+      <div class="metric-sub">Consumer Confidence</div>
+    </div>
+    <div class="metric-card">
+      <h4>Retail Sales YoY</h4>
+      <div class="metric-value" id="china-retail">--</div>
+      <div class="metric-sub">Latest month</div>
+    </div>
+    <div class="metric-card">
+      <h4>CNY/EUR</h4>
+      <div class="metric-value" id="china-cnyeur">--</div>
+      <div class="metric-delta" id="china-cnyeur-delta">--</div>
+    </div>
+    <div class="metric-card">
+      <h4>CSI 300</h4>
+      <div class="metric-value" id="china-csi">--</div>
+      <div class="metric-delta" id="china-csi-delta">--</div>
+    </div>
+    <div class="metric-card">
+      <h4>Hainan Duty-Free</h4>
+      <div class="metric-value">¥16.2B</div>
+      <div class="metric-sub">Jan 2026 (est)</div>
+    </div>
+  </div>
+
+  <!-- China Consumer Confidence -->
+  <div class="subsection">
+    <div class="subsection-title">China Consumer Confidence & Retail Sales</div>
+    <div class="chart-container" style="height:350px">
+      <canvas id="chart-china-consumer"></canvas>
+    </div>
+  </div>
+
+  <!-- Hainan Duty-Free -->
+  <div class="subsection">
+    <div class="subsection-title">Hainan Duty-Free Sales (Monthly, ¥B)</div>
+    <div class="chart-container" style="height:300px">
+      <canvas id="chart-hainan"></canvas>
+    </div>
+    <p style="font-size:.75rem;color:var(--text-muted);margin-top:8px">Single best public proxy for Chinese luxury appetite. Gov data, monthly frequency. Heavily skewed to luxury goods.</p>
+  </div>
+
+  <!-- CSI 300 -->
+  <div class="subsection">
+    <div class="subsection-title">CSI 300 & Hang Seng (Wealth Effect Proxy)</div>
+    <div class="chart-container" style="height:300px">
+      <canvas id="chart-china-stocks"></canvas>
+    </div>
+  </div>
+
+  <!-- China Context -->
+  <div class="grid-2 subsection">
+    <div class="card" style="border-left:3px solid var(--amber)">
+      <h4 style="color:var(--amber);margin-bottom:8px">MS Headwind #2: Chinese National Spending</h4>
+      <p style="font-size:.85rem;color:var(--text-secondary);line-height:1.7">APAC ex-JP grew only +5% in FY25 (vs +7% in FY24). Aspirational consumer performance "remains challenging" per Bernstein. Local price increases were lower in FY26 due to more harmonized pricing with lower FX adjustments.</p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green)">
+      <h4 style="color:var(--green);margin-bottom:8px">Positive: Sequential Improvement in Q4</h4>
+      <p style="font-size:.85rem;color:var(--text-secondary);line-height:1.7">Bernstein noted encouraging sequential improvements in Chinese demand during Q4 FY25, driven by strong local interest in high-value leather goods and jewelry. Stabilization supported by loyal affluent customers.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- TAB 5: TOURIST FLOW & GCC -->
+<!-- ====================================================================== -->
+<div id="tourist" class="section">
+  <div class="section-header">
+    <h2>Tourist Flow & GCC Tracker</h2>
+    <p>Middle East offshore spending, European tourist flows, and VAT refund proxies</p>
+  </div>
+
+  <!-- ME Exposure Alert -->
+  <div class="card subsection" style="border:1px solid rgba(248,81,73,.4);background:rgba(248,81,73,.03)">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <span class="card-badge badge-red">HEADWIND ALERT</span>
+      <h3 style="font-size:1.1rem">Middle East Offshore Spending: -40% Feb-Mar 2026</h3>
+    </div>
+    <div class="grid-3">
+      <div><strong style="font-size:.85rem;color:var(--text-primary)">Hermès ME Exposure:</strong><br><span style="font-size:.85rem;color:var(--text-secondary)">~3% of sales (MS est). ~60% tourist-driven.</span></div>
+      <div><strong style="font-size:.85rem;color:var(--text-primary)">Key Impact:</strong><br><span style="font-size:.85rem;color:var(--text-secondary)">Kepler cut Q1 LFL to +7.2% from higher (vs cons +9.5%). Traffic-driven categories most penalized.</span></div>
+      <div><strong style="font-size:.85rem;color:var(--text-primary)">Context:</strong><br><span style="font-size:.85rem;color:var(--text-secondary)">Eid al-Fitr (~Mar 19-20) is peak luxury spending. Ramadan rush typically drives significant GCC purchases abroad.</span></div>
+    </div>
+  </div>
+
+  <!-- GCC KPIs -->
+  <div class="grid-4 subsection">
+    <div class="metric-card">
+      <h4>Brent Crude</h4>
+      <div class="metric-value" id="gcc-brent">--</div>
+      <div class="metric-sub">GCC wealth proxy</div>
+    </div>
+    <div class="metric-card">
+      <h4>Gold Price</h4>
+      <div class="metric-value" id="gcc-gold">--</div>
+      <div class="metric-sub">Safe haven / GCC preference</div>
+    </div>
+    <div class="metric-card">
+      <h4>EUR/USD</h4>
+      <div class="metric-value" id="gcc-eurusd">--</div>
+      <div class="metric-sub">US tourist purchasing power</div>
+    </div>
+    <div class="metric-card">
+      <h4>Global Blue (GB:LN)</h4>
+      <div class="metric-value" id="gcc-globalblue">--</div>
+      <div class="metric-sub">VAT refund proxy</div>
+    </div>
+  </div>
+
+  <!-- ME/GCC Charts -->
+  <div class="subsection">
+    <div class="subsection-title">Oil & Gold Prices (GCC Wealth Indicators)</div>
+    <div class="chart-container" style="height:350px">
+      <canvas id="chart-gcc-commodities"></canvas>
+    </div>
+  </div>
+
+  <!-- Dubai Tourism -->
+  <div class="subsection">
+    <div class="subsection-title">Dubai Tourism Arrivals (Monthly, M)</div>
+    <div class="chart-container" style="height:300px">
+      <canvas id="chart-dubai-tourism"></canvas>
+    </div>
+  </div>
+
+  <!-- European Tourist Flow -->
+  <div class="subsection">
+    <div class="subsection-title">European Tourist Retail Environment</div>
+    <div class="grid-3">
+      <div class="metric-card">
+        <h4>Paris Hotel Occupancy</h4>
+        <div class="metric-value">78%</div>
+        <div class="metric-delta down">-3pts YoY (Jan 2026)</div>
+      </div>
+      <div class="metric-card">
+        <h4>France Tourist Arrivals</h4>
+        <div class="metric-value">7.2M</div>
+        <div class="metric-delta flat">~flat YoY (Jan 2026)</div>
+      </div>
+      <div class="metric-card">
+        <h4>Hermès France Exposure</h4>
+        <div class="metric-value">~10%</div>
+        <div class="metric-sub">Disproportionately tourist-heavy</div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px;border-left:3px solid var(--amber)">
+      <h4 style="color:var(--amber);margin-bottom:8px">France: Tourist-Heavy, Vulnerable</h4>
+      <p style="font-size:.85rem;color:var(--text-secondary);line-height:1.7">Hermès flagged industry data pointing to lower tourist spending in Europe. France has a disproportionately higher skew towards tourists. MS estimates France growth decelerating to +2% in Q1 26 (from +14% in Q1 24). Europe ex-France also weighed down but to a smaller degree.</p>
+    </div>
+  </div>
+
+  <!-- Ramadan/Eid Calendar -->
+  <div class="subsection">
+    <div class="subsection-title">Ramadan & Eid Calendar (Luxury Spending Seasonality)</div>
+    <div class="card">
+      <table class="data-table">
+        <thead><tr><th>Event</th><th>2025</th><th>2026</th><th>Luxury Impact</th></tr></thead>
+        <tbody>
+          <tr><td>Ramadan Start</td><td>Feb 28</td><td>Feb 18</td><td>Fasting period — reduced shopping</td></tr>
+          <tr><td>Eid al-Fitr</td><td>Mar 30-31</td><td>Mar 19-20</td><td><strong style="color:var(--accent)">Peak luxury spending — "Ramadan Rush"</strong></td></tr>
+          <tr><td>Eid al-Adha</td><td>Jun 6-7</td><td>May 27-28</td><td>Second peak — gifting season</td></tr>
+          <tr><td>Golden Week (China)</td><td>Oct 1-7</td><td>Oct 1-7</td><td>Major Chinese tourist shopping period</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- TAB 6: SECTOR & PEERS -->
+<!-- ====================================================================== -->
+<div id="sector" class="section">
+  <div class="section-header">
+    <h2>Sector & Competitive Landscape</h2>
+    <p>Peer comparison, relative performance, and earnings read-across</p>
+  </div>
+
+  <!-- Peer Stock Performance -->
+  <div class="subsection">
+    <div class="subsection-title">Relative Stock Performance (Indexed to 100)</div>
+    <div class="chart-container" style="height:400px">
+      <canvas id="chart-peer-stocks"></canvas>
+    </div>
+    <div class="loading" id="peer-loading">Fetching live stock data from Yahoo Finance...</div>
+  </div>
+
+  <!-- Peer Table -->
+  <div class="subsection">
+    <div class="subsection-title">Peer Comparison</div>
+    <div class="card">
+      <table class="data-table" id="peer-table">
+        <thead>
+          <tr>
+            <th>Company</th><th>Ticker</th><th>Price</th><th>Chg %</th><th>Mkt Cap (€B)</th>
+            <th>P/E (FY26e)</th><th>EBIT Margin</th><th>Organic Growth</th><th>ME Exposure</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Hermès</strong></td><td>RMS.PA</td><td id="peer-rms-price">--</td><td id="peer-rms-chg">--</td><td>174</td><td>36x</td><td>41.1%</td><td>+8.9%</td><td>~3%</td></tr>
+          <tr><td>LVMH</td><td>MC.PA</td><td id="peer-mc-price">--</td><td id="peer-mc-chg">--</td><td>290</td><td>19x</td><td>26.4%</td><td>+2%</td><td>~5%</td></tr>
+          <tr><td>Kering</td><td>KER.PA</td><td id="peer-ker-price">--</td><td id="peer-ker-chg">--</td><td>26</td><td>18x</td><td>16.2%</td><td>-10%</td><td>~5%</td></tr>
+          <tr><td>Richemont</td><td>CFR.SW</td><td id="peer-cfr-price">--</td><td id="peer-cfr-chg">--</td><td>82</td><td>22x</td><td>27.0%</td><td>+4%</td><td>~9%</td></tr>
+          <tr><td>Burberry</td><td>BRBY.L</td><td id="peer-brby-price">--</td><td id="peer-brby-chg">--</td><td>6</td><td>28x</td><td>12.5%</td><td>-5%</td><td>~2%</td></tr>
+          <tr><td>Brunello Cucinelli</td><td>BC.MI</td><td id="peer-bc-price">--</td><td id="peer-bc-chg">--</td><td>14</td><td>45x</td><td>18.5%</td><td>+12%</td><td>~4%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Broker Views -->
+  <div class="subsection">
+    <div class="subsection-title">Broker Price Targets & Ratings</div>
+    <div class="card">
+      <table class="data-table">
+        <thead><tr><th>Broker</th><th>Rating</th><th>Price Target</th><th>Upside</th><th>Key View</th></tr></thead>
+        <tbody>
+          <tr><td>Morgan Stanley</td><td><span class="card-badge badge-amber">Equal-Weight</span></td><td>€2,280</td><td class="positive">+37.7%</td><td>DCF-based. WACC 6.3%, LT growth 2.8%</td></tr>
+          <tr><td>Bernstein</td><td><span class="card-badge badge-green">Outperform</span></td><td>€2,650</td><td class="positive">+60.0%</td><td>Sky-high brand desirability. Conservative mgmt tone.</td></tr>
+          <tr><td>Kepler Cheuvreux</td><td><span class="card-badge badge-green">Buy</span></td><td>--</td><td>--</td><td>Safe-haven. Pullback = entry point. ME headwind exogenous.</td></tr>
+          <tr><td>RBC Capital Markets</td><td><span class="card-badge badge-green">Outperform</span></td><td>--</td><td>--</td><td>10% organic growth FY26. TSR 21% over 20 yrs.</td></tr>
+          <tr><td>Deutsche Bank</td><td><span class="card-badge badge-green">Buy</span></td><td>--</td><td>--</td><td>Strong Q4, RTW momentum, premium demand undiminished.</td></tr>
+          <tr><td>Jefferies</td><td><span class="card-badge badge-green">Buy</span></td><td>--</td><td>--</td><td>Opex control, 161bps GM expansion, pricing power.</td></tr>
+          <tr><td>CFRA</td><td><span class="card-badge badge-amber">Hold</span></td><td>--</td><td>--</td><td>Cautious. MSD growth normalization. Volatile macro.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Risk Reward -->
+  <div class="subsection">
+    <div class="subsection-title">Morgan Stanley Risk/Reward (12M)</div>
+    <div class="grid-3">
+      <div class="card" style="text-align:center;border-top:3px solid var(--green)">
+        <h4 style="color:var(--green);margin-bottom:8px">BULL CASE</h4>
+        <div style="font-size:2rem;font-weight:700;color:var(--green)">€3,000</div>
+        <div style="font-size:.8rem;color:var(--text-secondary);margin-top:4px">+81% upside</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:8px">Options prob: ~0.5%</div>
+      </div>
+      <div class="card" style="text-align:center;border-top:3px solid var(--accent)">
+        <h4 style="color:var(--accent);margin-bottom:8px">BASE CASE</h4>
+        <div style="font-size:2rem;font-weight:700;color:var(--accent)">€2,280</div>
+        <div style="font-size:.8rem;color:var(--text-secondary);margin-top:4px">+38% upside</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:8px">Options prob: ~12.7%</div>
+      </div>
+      <div class="card" style="text-align:center;border-top:3px solid var(--red)">
+        <h4 style="color:var(--red);margin-bottom:8px">BEAR CASE</h4>
+        <div style="font-size:2rem;font-weight:700;color:var(--red)">€1,495</div>
+        <div style="font-size:.8rem;color:var(--text-secondary);margin-top:4px">-9.7% downside</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:8px">Options prob: ~37.6%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Earnings Calendar -->
+  <div class="subsection">
+    <div class="subsection-title">Luxury Peer Earnings Calendar (Q1 2026)</div>
+    <div class="card">
+      <table class="data-table">
+        <thead><tr><th>Company</th><th>Report Date</th><th>Type</th><th>Read-Across For</th></tr></thead>
+        <tbody>
+          <tr><td>LVMH</td><td>Apr 14, 2026</td><td>Q1 Revenue</td><td>Broad luxury demand, China, travel retail</td></tr>
+          <tr><td><strong style="color:var(--accent)">Hermès</strong></td><td><strong style="color:var(--accent)">Apr 15, 2026</strong></td><td>Q1 Revenue</td><td>--</td></tr>
+          <tr><td>Kering</td><td>Apr 22, 2026</td><td>Q1 Revenue</td><td>Gucci turnaround, China weakness</td></tr>
+          <tr><td>Richemont</td><td>May 2026</td><td>FY Results</td><td>Hard luxury, jewelry demand, ME exposure</td></tr>
+          <tr><td>Burberry</td><td>May 2026</td><td>FY Results</td><td>Accessible luxury, UK/Europe</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- TAB 7: SUPPLY & THESIS -->
+<!-- ====================================================================== -->
+<div id="thesis" class="section">
+  <div class="section-header">
+    <h2>Supply Side & Thesis Tracker</h2>
+    <p>Production capacity, competitive moat analysis, and bull/bear scorecard</p>
+  </div>
+
+  <!-- Capacity Roadmap -->
+  <div class="subsection">
+    <div class="subsection-title">Production Capacity Roadmap</div>
+    <div class="timeline">
+      <div class="timeline-item"><div class="timeline-date">2026</div><div class="timeline-content"><strong>Loupes Atelier (Gironde)</strong> — New leather goods workshop. Contributes to +6-7% vol growth target.</div></div>
+      <div class="timeline-item"><div class="timeline-date">2027</div><div class="timeline-content"><strong>Charleville-Mézières (Ardennes)</strong> — Additional capacity for leather goods and potentially new categories.</div></div>
+      <div class="timeline-item"><div class="timeline-date">2028</div><div class="timeline-content"><strong>Colombelles (Calvados)</strong> — Continuing expansion of artisan base in Normandy region.</div></div>
+      <div class="timeline-item"><div class="timeline-date">2030</div><div class="timeline-content"><strong>Les Andelys (Eure)</strong> — Furthest-dated capacity addition. Anchors long-term growth through decade.</div></div>
+    </div>
+    <div class="grid-3" style="margin-top:16px">
+      <div class="metric-card">
+        <h4>Current Ateliers</h4>
+        <div class="metric-value">60</div>
+        <div class="metric-sub">Production & training units in France</div>
+      </div>
+      <div class="metric-card">
+        <h4>Vol Growth Guide</h4>
+        <div class="metric-value">6-7%</div>
+        <div class="metric-sub">Annually through 2030</div>
+      </div>
+      <div class="metric-card">
+        <h4>Vertical Integration</h4>
+        <div class="metric-value">75%</div>
+        <div class="metric-sub">100% for core leather goods</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supply Indicators -->
+  <div class="subsection">
+    <div class="subsection-title">Supply-Side Indicators</div>
+    <div class="grid-2">
+      <div class="chart-container" style="height:300px">
+        <h3>French Manufacturing PMI</h3>
+        <canvas id="chart-france-pmi"></canvas>
+      </div>
+      <div class="card">
+        <h4 style="color:var(--accent);margin-bottom:12px">Supply Constraint = Feature, Not Bug</h4>
+        <p style="font-size:.85rem;color:var(--text-secondary);line-height:1.7">Unlike competitors that expand production to capture demand, Hermès deliberately bottlenecks growth through the lengthy timelines required to train new artisans (2 years + 1 year internship). This strict demand-pull model ensures demand > supply, eliminating need for discounting.</p>
+        <p style="font-size:.85rem;color:var(--text-secondary);line-height:1.7;margin-top:12px"><strong style="color:var(--red)">Bear risk:</strong> Kepler warns that slower-than-expected capacity increases could hold back the most profitable category's growth.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bull/Bear Scorecard -->
+  <div class="subsection">
+    <div class="subsection-title">Bull / Bear Thesis Scorecard</div>
+    <div class="grid-2">
+      <div class="card" style="border-top:3px solid var(--green)">
+        <h3 style="color:var(--green);margin-bottom:16px;font-size:1.1rem">Bull Case Arguments</h3>
+        <div class="thesis-item"><div class="thesis-num bull">1</div><div class="thesis-text"><strong>Pricing Power:</strong> 5-6% annual increases without consumer resistance. No discounting. Zero markdown policy.</div></div>
+        <div class="thesis-item"><div class="thesis-num bull">2</div><div class="thesis-text"><strong>Scarcity Moat:</strong> Demand permanently exceeds supply. Waitlists are a feature. Competitors cannot replicate artisan model.</div></div>
+        <div class="thesis-item"><div class="thesis-num bull">3</div><div class="thesis-text"><strong>Fortress Balance Sheet:</strong> €12.8B net cash. FCF/NI ~90%. Cumulative dividend potential: €13.8B over next 5 years (RBC).</div></div>
+        <div class="thesis-item"><div class="thesis-num bull">4</div><div class="thesis-text"><strong>New Categories:</strong> Haute couture (2027), cosmetics/skincare (2027-28), tech accessories (Kelly headphones). Expanding TAM.</div></div>
+        <div class="thesis-item"><div class="thesis-num bull">5</div><div class="thesis-text"><strong>Defensive Safe Haven:</strong> Highest sales/store in industry. Structural demand for leather goods. 21% TSR over 20 years.</div></div>
+      </div>
+      <div class="card" style="border-top:3px solid var(--red)">
+        <h3 style="color:var(--red);margin-bottom:16px;font-size:1.1rem">Bear Case Arguments</h3>
+        <div class="thesis-item"><div class="thesis-num bear">1</div><div class="thesis-text"><strong>Valuation Extreme:</strong> 47x forward P/E. If growth slows to MSD, rapid de-rating risk (CFRA). Two-thirds of equity value in terminal value.</div></div>
+        <div class="thesis-item"><div class="thesis-num bear">2</div><div class="thesis-text"><strong>ME Headwind:</strong> -40% offshore spending Feb-Mar 2026. Geopolitical disruption to traffic-driven categories and Eid spending.</div></div>
+        <div class="thesis-item"><div class="thesis-num bear">3</div><div class="thesis-text"><strong>China Deceleration:</strong> APAC ex-JP from +7% to +5%. Aspirational consumer still challenged. Lower local price increases in FY26.</div></div>
+        <div class="thesis-item"><div class="thesis-num bear">4</div><div class="thesis-text"><strong>Margin Unwind Risk:</strong> Post-COVID margins may prove unsustainable. Multi-year unwind not in consensus (RBC).</div></div>
+        <div class="thesis-item"><div class="thesis-num bear">5</div><div class="thesis-text"><strong>Product Concentration:</strong> Birkin & Kelly ~25-33% of sales/profit. Exotic skin sourcing ESG risk. California tying lawsuit.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key Monitoring Checklist -->
+  <div class="subsection">
+    <div class="subsection-title">Key Monitoring Checklist</div>
+    <div class="card">
+      <div class="thesis-item"><div class="thesis-num" style="background:rgba(201,169,110,.15);color:var(--accent)">1</div><div class="thesis-text"><strong>Q1 organic growth vs +9.5% consensus.</strong> MS at +7.4%. Key test of resilience amid headwinds.</div></div>
+      <div class="thesis-item"><div class="thesis-num" style="background:rgba(201,169,110,.15);color:var(--accent)">2</div><div class="thesis-text"><strong>APAC ex-JP trajectory.</strong> Sequential improvement from Q4? Or further deceleration?</div></div>
+      <div class="thesis-item"><div class="thesis-num" style="background:rgba(201,169,110,.15);color:var(--accent)">3</div><div class="thesis-text"><strong>France performance.</strong> Tourist spending recovery or continued weakness? Disproportionate exposure.</div></div>
+      <div class="thesis-item"><div class="thesis-num" style="background:rgba(201,169,110,.15);color:var(--accent)">4</div><div class="thesis-text"><strong>Birkin resale premium trend.</strong> Stabilizing at 1.3-1.4x or further erosion toward 1.0x?</div></div>
+      <div class="thesis-item"><div class="thesis-num" style="background:rgba(201,169,110,.15);color:var(--accent)">5</div><div class="thesis-text"><strong>ME conflict resolution.</strong> When does offshore spending normalize? Critical for H2 outlook.</div></div>
+      <div class="thesis-item"><div class="thesis-num" style="background:rgba(201,169,110,.15);color:var(--accent)">6</div><div class="thesis-text"><strong>Leather goods volume guidance.</strong> Any change to 6-7%? Capacity delays = growth constraint.</div></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- ========== FOOTER ========== -->
+<div class="footer">
+  Hermès (RMS FP) Leading Indicator Trade Screen · Data as of March 2026 · Sources: Morgan Stanley, Bernstein, AlphaSense, Yahoo Finance, akshare, Google Trends
+  <br>Not investment advice. For informational purposes only.
+</div>
+
+<!-- ====================================================================== -->
+<!-- JAVASCRIPT -->
+<!-- ====================================================================== -->
+<script>
+// ========== TAB NAVIGATION ==========
+const tabs = document.querySelectorAll('.nav-tab');
+const sections = document.querySelectorAll('.section');
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    tabs.forEach(t => t.classList.remove('active'));
+    sections.forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.tab).classList.add('active');
+    // Trigger chart renders on tab switch
+    if(tab.dataset.tab === 'overview') renderOverviewCharts();
+    if(tab.dataset.tab === 'demand') renderDemandCharts();
+    if(tab.dataset.tab === 'resale') renderResaleCharts();
+    if(tab.dataset.tab === 'china') renderChinaCharts();
+    if(tab.dataset.tab === 'tourist') renderTouristCharts();
+    if(tab.dataset.tab === 'sector') renderSectorCharts();
+    if(tab.dataset.tab === 'thesis') renderThesisCharts();
+  });
+});
+
+// ========== CHART.JS DEFAULTS ==========
+Chart.defaults.color = '#8b949e';
+Chart.defaults.borderColor = '#30363d';
+Chart.defaults.font.family = "'General Sans', system-ui, sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.pointStyleWidth = 8;
+Chart.defaults.plugins.legend.labels.padding = 16;
+
+// ========== EMBEDDED DATA ==========
+
+// Google Trends data (embedded, refreshed manually or via GH Actions)
+const trendsMonths = ['Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26'];
+const trendsData = {
+  'Hermès':      [78,82,75,70,73,80,85,92,100,76,72,68],
+  'Birkin':      [85,88,82,78,80,86,90,95,100,82,78,74],
+  'Kelly bag':   [72,75,70,68,71,76,80,84,90,74,70,66],
+  'Hermès scarf':[65,60,55,48,45,58,70,82,100,55,50,42],
+  'Hermès gift': [55,50,42,35,30,45,65,85,100,48,40,32],
+};
+
+// Baidu search index (placeholder — updated via akshare GH Actions)
+const baiduMonths = ['Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26'];
+const baiduData = [6200,5800,5500,5200,5400,5800,6100,6500,7200,6800,6400,6000];
+
+// Resale data (placeholder — updated via GH Actions scraping)
+const resaleMonths = ['Q1 22','Q2 22','Q3 22','Q4 22','Q1 23','Q2 23','Q3 23','Q4 23','Q1 24','Q2 24','Q3 24','Q4 24','Q1 25','Q2 25','Q3 25','Q4 25','Q1 26'];
+const resalePremium = [2.2,2.15,2.0,1.9,1.85,1.75,1.65,1.55,1.50,1.48,1.45,1.42,1.40,1.38,1.36,1.35,1.33];
+const birkin25Price = [18000,17500,16500,15800,15200,14500,14000,13500,13200,13000,12800,12600,12500,12400,12300,12200,12100];
+const birkin30Price = [20000,19500,18500,17500,17000,16200,15500,14800,14400,14100,13800,13500,13300,13100,12800,12600,12400];
+const birkin35Price = [16000,15500,14800,14200,13800,13200,12800,12400,12200,12000,11800,11600,11500,11400,11300,11200,11100];
+const kellyPrice =    [15000,14600,14000,13500,13100,12600,12200,11800,11600,11400,11200,11000,10900,10800,10700,10600,10500];
+
+// China data (placeholder — updated via akshare GH Actions)
+const chinaMonths = ['Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26'];
+const chinaCCI = [89.5,89.2,89.8,90.1,89.6,89.3,88.9,89.1,89.5,89.8,90.0,90.2,90.1,89.8];
+const chinaRetailYoY = [3.7,4.0,5.9,5.1,4.7,3.7,2.7,3.4,3.2,4.8,3.0,3.7,4.2,4.0];
+
+// Hainan duty-free (¥B)
+const hainanMonths = ['Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26'];
+const hainanData = [14.5,16.8,13.2,12.8,14.1,13.5,15.2,14.8,13.9,16.5,13.0,15.8,16.2,15.5];
+
+// Dubai tourism (M arrivals)
+const dubaiMonths = ['Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26'];
+const dubaiData = [1.82,1.75,1.68,1.55,1.42,1.20,1.15,1.10,1.25,1.50,1.65,1.90,1.85,1.70];
+
+// France PMI
+const pmiMonths = ['Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26'];
+const pmiData = [46.3,46.7,45.4,44.1,43.9,44.6,44.2,43.1,41.9,45.5,45.8,46.2];
+
+// Resale heatmap data
+const heatmapData = [
+  {model:'Birkin 25',togo:1.45,epsom:1.20,clemence:1.35,ostrich:1.65,croco:2.10},
+  {model:'Birkin 30',togo:1.35,epsom:1.15,clemence:1.28,ostrich:1.55,croco:1.95},
+  {model:'Birkin 35',togo:1.18,epsom:1.05,clemence:1.12,ostrich:1.40,croco:1.75},
+  {model:'Kelly 25',togo:1.30,epsom:1.12,clemence:1.22,ostrich:1.50,croco:1.85},
+  {model:'Kelly 28',togo:1.22,epsom:1.08,clemence:1.15,ostrich:1.42,croco:1.70},
+  {model:'Kelly 32',togo:1.10,epsom:0.98,clemence:1.05,ostrich:1.30,croco:1.55},
+];
+
+// ========== LIVE DATA FETCHING ==========
+// Loads from data/live-data.json (generated by scripts/fetch_data.py)
+// Run: python scripts/fetch_data.py to refresh data
+
+async function initLiveData() {
+  try {
+    const resp = await fetch('data/live-data.json');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+
+    const stocks = data.stocks || {};
+    const fx = data.fx || {};
+
+    // Transform into the format the rest of the code expects
+    const results = {};
+    for (const [sym, d] of Object.entries(stocks)) {
+      results[sym] = {
+        symbol: sym,
+        price: d.price,
+        prevClose: d.prevClose,
+        currency: d.currency || 'EUR',
+        closes: d.closes || [],
+        dates: d.dates || []
+      };
+    }
+
+    // Update header bar
+    if(results['RMS.PA']) {
+      const rms = results['RMS.PA'];
+      document.getElementById('live-price').textContent = `\u20AC${rms.price.toFixed(2)}`;
+      const chg = ((rms.price - rms.prevClose) / rms.prevClose * 100).toFixed(2);
+      const chgEl = document.getElementById('live-change');
+      chgEl.textContent = `${chg > 0 ? '+' : ''}${chg}%`;
+      chgEl.className = `stock-change ${chg >= 0 ? 'up' : 'down'}`;
+      const mcap = (rms.price * 105.0 / 1000).toFixed(0);
+      document.getElementById('live-mcap').textContent = `\u20AC${mcap}B`;
+    }
+
+    // Update peer table
+    const peerMap = {
+      'RMS.PA': {price:'peer-rms-price', chg:'peer-rms-chg'},
+      'MC.PA': {price:'peer-mc-price', chg:'peer-mc-chg'},
+      'KER.PA': {price:'peer-ker-price', chg:'peer-ker-chg'},
+      'CFR.SW': {price:'peer-cfr-price', chg:'peer-cfr-chg'},
+      'BRBY.L': {price:'peer-brby-price', chg:'peer-brby-chg'},
+      'BC.MI': {price:'peer-bc-price', chg:'peer-bc-chg'},
+    };
+
+    for(const [sym, els] of Object.entries(peerMap)) {
+      if(results[sym]) {
+        const d = results[sym];
+        const prefix = d.currency === 'GBp' ? '' : (d.currency === 'CHF' ? 'CHF ' : '\u20AC');
+        document.getElementById(els.price).textContent = `${prefix}${d.price.toFixed(2)}`;
+        const c = ((d.price - d.prevClose) / d.prevClose * 100).toFixed(2);
+        const el = document.getElementById(els.chg);
+        el.textContent = `${c > 0 ? '+' : ''}${c}%`;
+        el.className = c >= 0 ? 'positive' : 'negative';
+      }
+    }
+
+    // Commodity prices
+    if(results['BZ=F']) document.getElementById('gcc-brent').textContent = `$${results['BZ=F'].price.toFixed(2)}`;
+    if(results['GC=F']) document.getElementById('gcc-gold').textContent = `$${results['GC=F'].price.toFixed(0)}`;
+    if(results['EURUSD=X']) document.getElementById('gcc-eurusd').textContent = results['EURUSD=X'].price.toFixed(4);
+    if(results['GB.L']) document.getElementById('gcc-globalblue').textContent = `${(results['GB.L'].price/100).toFixed(2)}p`;
+
+    // FX rates from dedicated FX fetch
+    if(fx.EUR_CNY) document.getElementById('china-cnyeur').textContent = fx.EUR_CNY.toFixed(4);
+
+    // Store for charts
+    window.liveResults = results;
+
+    // Update timestamp
+    const updatedAt = data.updated_at ? new Date(data.updated_at).toLocaleString() : new Date().toLocaleString();
+    document.getElementById('last-updated').textContent = `Data: ${updatedAt}`;
+    document.getElementById('peer-loading').style.display = 'none';
+
+    // Render sector chart if currently active
+    if(document.querySelector('.nav-tab.active').dataset.tab === 'sector') renderSectorCharts();
+
+  } catch(e) {
+    console.warn('Failed to load live-data.json:', e);
+    document.getElementById('last-updated').textContent = 'Run: python scripts/fetch_data.py to load live data';
+    document.getElementById('peer-loading').textContent = 'No data file found. Run: python scripts/fetch_data.py';
+  }
+}
+
+// ========== SCORING ENGINE ==========
+function calculateCompositeScore() {
+  // Demand Pulse (25%) - based on latest Google Trends values
+  const latestHermes = trendsData['Hermès'][trendsData['Hermès'].length - 1];
+  const latestBirkin = trendsData['Birkin'][trendsData['Birkin'].length - 1];
+  const avgSearch = (latestHermes + latestBirkin) / 2;
+  const demandScore = Math.min(100, Math.max(0, avgSearch));
+
+  // Resale Market (25%) - premium relative to historical
+  const latestPremium = resalePremium[resalePremium.length - 1];
+  const resaleScore = Math.min(100, Math.max(0, (latestPremium / 2.2) * 100));
+
+  // China Consumer (20%) - CCI relative to baseline
+  const latestCCI = chinaCCI[chinaCCI.length - 1];
+  const chinaScore = Math.min(100, Math.max(0, ((latestCCI - 85) / 10) * 100));
+
+  // Tourist/GCC (15%)
+  const latestDubai = dubaiData[dubaiData.length - 1];
+  const touristScore = Math.min(100, Math.max(0, (latestDubai / 2.0) * 100));
+
+  // Sector momentum (15%) - placeholder
+  const sectorScore = 55;
+
+  const composite = Math.round(
+    demandScore * 0.25 +
+    resaleScore * 0.25 +
+    chinaScore * 0.20 +
+    touristScore * 0.15 +
+    sectorScore * 0.15
+  );
+
+  // Update UI
+  const scoreNum = document.getElementById('demand-score-num');
+  const scoreRing = document.getElementById('demand-score-ring');
+  const compositeSignal = document.getElementById('composite-signal');
+
+  if(scoreNum) scoreNum.textContent = composite;
+  if(scoreRing) {
+    const circumference = 2 * Math.PI * 50;
+    scoreRing.style.strokeDasharray = circumference;
+    scoreRing.style.strokeDashoffset = circumference - (composite / 100) * circumference;
+    scoreRing.style.stroke = composite > 70 ? 'var(--green)' : composite > 40 ? 'var(--amber)' : 'var(--red)';
+  }
+
+  const label = composite > 70 ? 'STRONG' : composite > 40 ? 'NEUTRAL' : 'WEAK';
+  const cls = composite > 70 ? 'signal-strong' : composite > 40 ? 'signal-neutral' : 'signal-weak';
+  compositeSignal.textContent = `COMPOSITE: ${composite} — ${label}`;
+  compositeSignal.className = `signal-badge ${cls}`;
+
+  // Update demand signal cards
+  updateSignalCard('sig-search', avgSearch, `${avgSearch.toFixed(0)}/100`);
+  updateSignalCard('sig-aspirational', (trendsData['Hermès gift'][trendsData['Hermès gift'].length-1] + trendsData['Hermès scarf'][trendsData['Hermès scarf'].length-1])/2, null);
+
+  return composite;
+}
+
+function updateSignalCard(id, score, label) {
+  const card = document.getElementById(id);
+  if(!card) return;
+  const valEl = card.querySelector('.sig-value');
+  const statusEl = card.querySelector('.sig-status');
+  if(valEl && label) valEl.textContent = label;
+  else if(valEl) valEl.textContent = `${score.toFixed(0)}/100`;
+
+  if(statusEl) {
+    if(score > 70) { statusEl.textContent = 'STRONG'; statusEl.style.background = 'rgba(63,185,80,.15)'; statusEl.style.color = 'var(--green)'; card.className = 'signal-card sig-green'; }
+    else if(score > 40) { statusEl.textContent = 'NEUTRAL'; statusEl.style.background = 'rgba(210,153,34,.15)'; statusEl.style.color = 'var(--amber)'; card.className = 'signal-card sig-amber'; }
+    else { statusEl.textContent = 'WEAK'; statusEl.style.background = 'rgba(248,81,73,.15)'; statusEl.style.color = 'var(--red)'; card.className = 'signal-card sig-red'; }
+  }
+}
+
+// ========== CHART RENDER FUNCTIONS ==========
+let chartInstances = {};
+function destroyChart(id) { if(chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } }
+
+function renderOverviewCharts() {
+  // Segment doughnut
+  destroyChart('chart-segment');
+  chartInstances['chart-segment'] = new Chart(document.getElementById('chart-segment'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Leather Goods & Saddlery','RTW & Accessories','Other Sectors','Silk & Textiles','Watches','Perfume & Beauty'],
+      datasets: [{
+        data: [44,28,13,6,4,3],
+        backgroundColor: ['#c9a96e','#58a6ff','#2dd4bf','#e8dcc8','#d29922','#f85149'],
+        borderColor: '#1c2128',
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom' },
+        title: { display: true, text: 'Revenue by Segment (FY25)', color: '#e6edf3' }
+      }
+    }
+  });
+
+  // Geography bar chart
+  destroyChart('chart-geo');
+  chartInstances['chart-geo'] = new Chart(document.getElementById('chart-geo'), {
+    type: 'bar',
+    data: {
+      labels: ['APAC ex-JP','Americas','Europe ex-FR','Japan','France','Others'],
+      datasets: [
+        { label: 'FY25 Revenue (€M)', data: [6702,3075,2362,1591,1575,697], backgroundColor: 'rgba(201,169,110,.6)', borderColor: '#c9a96e', borderWidth: 1 },
+      ]
+    },
+    options: {
+      responsive: true,
+      indexAxis: 'y',
+      plugins: { legend: { display: false }, title: { display: true, text: 'Revenue by Geography (€M)', color: '#e6edf3' } },
+      scales: { x: { grid: { color: '#30363d' } }, y: { grid: { display: false } } }
+    }
+  });
+}
+
+function renderDemandCharts() {
+  // Core trends
+  destroyChart('chart-trends-core');
+  chartInstances['chart-trends-core'] = new Chart(document.getElementById('chart-trends-core'), {
+    type: 'line',
+    data: {
+      labels: trendsMonths,
+      datasets: [
+        { label: '"Hermès"', data: trendsData['Hermès'], borderColor: '#c9a96e', backgroundColor: 'rgba(201,169,110,.1)', fill: true, tension: .3 },
+        { label: '"Birkin"', data: trendsData['Birkin'], borderColor: '#58a6ff', tension: .3 },
+        { label: '"Kelly bag"', data: trendsData['Kelly bag'], borderColor: '#2dd4bf', tension: .3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { title: { display: true, text: 'Google Trends — Core Brand Terms (Indexed 0-100)', color: '#e6edf3' } },
+      scales: { y: { min: 0, max: 110, grid: { color: '#30363d' } }, x: { grid: { color: '#30363d' } } }
+    }
+  });
+
+  // Aspirational trends
+  destroyChart('chart-trends-aspirational');
+  chartInstances['chart-trends-aspirational'] = new Chart(document.getElementById('chart-trends-aspirational'), {
+    type: 'line',
+    data: {
+      labels: trendsMonths,
+      datasets: [
+        { label: '"Hermès scarf"', data: trendsData['Hermès scarf'], borderColor: '#e8dcc8', tension: .3 },
+        { label: '"Hermès gift"', data: trendsData['Hermès gift'], borderColor: '#d29922', tension: .3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { title: { display: true, text: 'Aspirational / Entry-Level Search Terms', color: '#e6edf3' } },
+      scales: { y: { min: 0, max: 110, grid: { color: '#30363d' } }, x: { grid: { color: '#30363d' } } }
+    }
+  });
+
+  // Baidu
+  destroyChart('chart-baidu');
+  chartInstances['chart-baidu'] = new Chart(document.getElementById('chart-baidu'), {
+    type: 'line',
+    data: {
+      labels: baiduMonths,
+      datasets: [{ label: 'Baidu "爱马仕" Search Index', data: baiduData, borderColor: '#f85149', backgroundColor: 'rgba(248,81,73,.1)', fill: true, tension: .3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { title: { display: true, text: 'Baidu Search Index — "爱马仕" (Hermès in Chinese)', color: '#e6edf3' } },
+      scales: { y: { grid: { color: '#30363d' } }, x: { grid: { color: '#30363d' } } }
+    }
+  });
+
+  calculateCompositeScore();
+}
+
+function renderResaleCharts() {
+  // Premium over time
+  destroyChart('chart-resale-premium');
+  chartInstances['chart-resale-premium'] = new Chart(document.getElementById('chart-resale-premium'), {
+    type: 'line',
+    data: {
+      labels: resaleMonths,
+      datasets: [{
+        label: 'Birkin Resale Premium (x Retail)',
+        data: resalePremium,
+        borderColor: '#c9a96e',
+        backgroundColor: 'rgba(201,169,110,.15)',
+        fill: true,
+        tension: .3,
+        pointRadius: 4,
+        pointBackgroundColor: resalePremium.map(v => v > 1.5 ? '#3fb950' : v > 1.2 ? '#d29922' : '#f85149')
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: { display: true, text: 'Birkin Resale Premium vs Retail (2022-2026)', color: '#e6edf3' },
+        annotation: { annotations: { line1: { type: 'line', yMin: 1.0, yMax: 1.0, borderColor: '#f85149', borderDash: [6,4], borderWidth: 1, label: { display: true, content: 'Retail Parity', position: 'end' } } } }
+      },
+      scales: {
+        y: { min: 0.8, max: 2.5, grid: { color: '#30363d' }, title: { display: true, text: 'Premium Multiple (x)' } },
+        x: { grid: { color: '#30363d' } }
+      }
+    }
+  });
+
+  // Models over time
+  destroyChart('chart-resale-models');
+  chartInstances['chart-resale-models'] = new Chart(document.getElementById('chart-resale-models'), {
+    type: 'line',
+    data: {
+      labels: resaleMonths,
+      datasets: [
+        { label: 'Birkin 25', data: birkin25Price, borderColor: '#c9a96e', tension: .3 },
+        { label: 'Birkin 30', data: birkin30Price, borderColor: '#58a6ff', tension: .3 },
+        { label: 'Birkin 35', data: birkin35Price, borderColor: '#2dd4bf', tension: .3 },
+        { label: 'Kelly 25/28', data: kellyPrice, borderColor: '#e8dcc8', tension: .3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { title: { display: true, text: 'Average Resale Prices by Model (€)', color: '#e6edf3' } },
+      scales: {
+        y: { grid: { color: '#30363d' }, title: { display: true, text: 'Price (€)' }, ticks: { callback: v => '€' + v.toLocaleString() } },
+        x: { grid: { color: '#30363d' } }
+      }
+    }
+  });
+
+  // Heatmap
+  renderResaleHeatmap();
+}
+
+function renderResaleHeatmap() {
+  const container = document.getElementById('resale-heatmap');
+  if(!container) return;
+  container.innerHTML = '';
+
+  // Header row
+  const leathers = ['Togo','Epsom','Clemence','Ostrich','Croco'];
+  const headerHtml = '<div class="heatmap-cell" style="background:transparent;font-weight:700;color:var(--text-secondary)"></div>' +
+    leathers.map(l => `<div class="heatmap-cell" style="background:transparent;font-weight:700;color:var(--accent)">${l}</div>`).join('');
+  container.style.gridTemplateColumns = `120px repeat(${leathers.length}, 1fr)`;
+  container.innerHTML = headerHtml;
+
+  heatmapData.forEach(row => {
+    container.innerHTML += `<div class="heatmap-cell" style="background:transparent;font-weight:600;text-align:left;color:var(--text-primary)">${row.model}</div>`;
+    [row.togo, row.epsom, row.clemence, row.ostrich, row.croco].forEach(val => {
+      const color = val >= 1.5 ? 'rgba(63,185,80,.3)' : val >= 1.2 ? 'rgba(210,153,34,.3)' : val >= 1.0 ? 'rgba(248,81,73,.2)' : 'rgba(248,81,73,.4)';
+      container.innerHTML += `<div class="heatmap-cell" style="background:${color}">${val.toFixed(2)}x</div>`;
+    });
+  });
+}
+
+function renderChinaCharts() {
+  // Consumer confidence + retail sales
+  destroyChart('chart-china-consumer');
+  chartInstances['chart-china-consumer'] = new Chart(document.getElementById('chart-china-consumer'), {
+    type: 'line',
+    data: {
+      labels: chinaMonths,
+      datasets: [
+        { label: 'Consumer Confidence Index', data: chinaCCI, borderColor: '#c9a96e', tension: .3, yAxisID: 'y' },
+        { label: 'Retail Sales YoY (%)', data: chinaRetailYoY, borderColor: '#58a6ff', tension: .3, yAxisID: 'y1' },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { title: { display: true, text: 'China Consumer Confidence & Retail Sales', color: '#e6edf3' } },
+      scales: {
+        y: { position: 'left', grid: { color: '#30363d' }, title: { display: true, text: 'CCI' } },
+        y1: { position: 'right', grid: { display: false }, title: { display: true, text: 'Retail Sales YoY (%)' } },
+        x: { grid: { color: '#30363d' } }
+      }
+    }
+  });
+
+  // Hainan
+  destroyChart('chart-hainan');
+  chartInstances['chart-hainan'] = new Chart(document.getElementById('chart-hainan'), {
+    type: 'bar',
+    data: {
+      labels: hainanMonths,
+      datasets: [{ label: 'Hainan Duty-Free Sales (¥B)', data: hainanData, backgroundColor: 'rgba(201,169,110,.5)', borderColor: '#c9a96e', borderWidth: 1 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { title: { display: true, text: 'Hainan Duty-Free Monthly Sales (¥ Billion)', color: '#e6edf3' } },
+      scales: { y: { grid: { color: '#30363d' } }, x: { grid: { color: '#30363d' } } }
+    }
+  });
+
+  // CSI 300 placeholder
+  destroyChart('chart-china-stocks');
+  chartInstances['chart-china-stocks'] = new Chart(document.getElementById('chart-china-stocks'), {
+    type: 'line',
+    data: {
+      labels: chinaMonths,
+      datasets: [{ label: 'CSI 300 (indexed)', data: [100,98,102,105,103,100,97,99,101,104,106,108,107,105], borderColor: '#f85149', tension: .3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { title: { display: true, text: 'CSI 300 Index (Indexed to 100)', color: '#e6edf3' } },
+      scales: { y: { grid: { color: '#30363d' } }, x: { grid: { color: '#30363d' } } }
+    }
+  });
+
+  // Update KPI cards
+  document.getElementById('china-cci').textContent = chinaCCI[chinaCCI.length-1];
+  document.getElementById('china-retail').textContent = chinaRetailYoY[chinaRetailYoY.length-1] + '%';
+}
+
+function renderTouristCharts() {
+  // GCC commodities — use live data if available
+  destroyChart('chart-gcc-commodities');
+  const brentData = window.liveResults?.['BZ=F']?.closes?.slice(-90) || [72,73,71,70,72,74,73,72,71,70,69,68];
+  const goldData = window.liveResults?.['GC=F']?.closes?.slice(-90) || [2050,2080,2100,2120,2090,2070,2060,2080,2100,2130,2150,2170];
+  const labels = brentData.map((_, i) => i % 5 === 0 ? `Day ${i}` : '');
+
+  chartInstances['chart-gcc-commodities'] = new Chart(document.getElementById('chart-gcc-commodities'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'Brent Crude ($)', data: brentData, borderColor: '#c9a96e', tension: .3, yAxisID: 'y' },
+        { label: 'Gold ($)', data: goldData, borderColor: '#d29922', tension: .3, yAxisID: 'y1' },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { title: { display: true, text: 'Brent Crude & Gold — GCC Wealth Proxies', color: '#e6edf3' } },
+      scales: {
+        y: { position: 'left', grid: { color: '#30363d' }, title: { display: true, text: 'Brent ($)' } },
+        y1: { position: 'right', grid: { display: false }, title: { display: true, text: 'Gold ($)' } },
+        x: { grid: { color: '#30363d' }, ticks: { maxTicksLimit: 12 } }
+      }
+    }
+  });
+
+  // Dubai tourism
+  destroyChart('chart-dubai-tourism');
+  chartInstances['chart-dubai-tourism'] = new Chart(document.getElementById('chart-dubai-tourism'), {
+    type: 'bar',
+    data: {
+      labels: dubaiMonths,
+      datasets: [{ label: 'Dubai Tourism Arrivals (M)', data: dubaiData, backgroundColor: 'rgba(45,212,191,.5)', borderColor: '#2dd4bf', borderWidth: 1 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { title: { display: true, text: 'Dubai Monthly Tourism Arrivals (Millions)', color: '#e6edf3' } },
+      scales: { y: { grid: { color: '#30363d' } }, x: { grid: { color: '#30363d' } } }
+    }
+  });
+}
+
+function renderSectorCharts() {
+  destroyChart('chart-peer-stocks');
+
+  // Build indexed performance from live data
+  const peers = ['RMS.PA','MC.PA','KER.PA','CFR.SW','BRBY.L','BC.MI'];
+  const colors = ['#c9a96e','#58a6ff','#f85149','#2dd4bf','#e8dcc8','#d29922'];
+  const names = ['Hermès','LVMH','Kering','Richemont','Burberry','Cucinelli'];
+
+  const datasets = [];
+  let maxLen = 0;
+
+  peers.forEach((sym, i) => {
+    const d = window.liveResults?.[sym];
+    if(d && d.closes.length > 0) {
+      const base = d.closes[0];
+      const indexed = d.closes.map(c => (c / base * 100).toFixed(2));
+      maxLen = Math.max(maxLen, indexed.length);
+      datasets.push({
+        label: names[i],
+        data: indexed,
+        borderColor: colors[i],
+        borderWidth: sym === 'RMS.PA' ? 3 : 1.5,
+        tension: .3,
+        pointRadius: 0,
+      });
+    }
+  });
+
+  const labels = Array.from({length: maxLen}, (_, i) => {
+    if(i === 0) return '6M ago';
+    if(i === Math.floor(maxLen/2)) return '3M ago';
+    if(i === maxLen - 1) return 'Today';
+    return '';
+  });
+
+  if(datasets.length === 0) {
+    // Fallback placeholder
+    datasets.push({ label: 'No live data', data: [100], borderColor: '#8b949e' });
+  }
+
+  chartInstances['chart-peer-stocks'] = new Chart(document.getElementById('chart-peer-stocks'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: { display: true, text: 'Relative Stock Performance — 6 Month (Indexed to 100)', color: '#e6edf3' },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        y: { grid: { color: '#30363d' }, title: { display: true, text: 'Indexed (100 = Start)' } },
+        x: { grid: { color: '#30363d' }, ticks: { maxTicksLimit: 6 } }
+      },
+      interaction: { mode: 'nearest', axis: 'x', intersect: false }
+    }
+  });
+}
+
+function renderThesisCharts() {
+  // France PMI
+  destroyChart('chart-france-pmi');
+  chartInstances['chart-france-pmi'] = new Chart(document.getElementById('chart-france-pmi'), {
+    type: 'line',
+    data: {
+      labels: pmiMonths,
+      datasets: [{
+        label: 'France Manufacturing PMI',
+        data: pmiData,
+        borderColor: '#c9a96e',
+        backgroundColor: pmiData.map(v => v >= 50 ? 'rgba(63,185,80,.2)' : 'rgba(248,81,73,.2)'),
+        fill: true,
+        tension: .3,
+        pointRadius: 4,
+        pointBackgroundColor: pmiData.map(v => v >= 50 ? '#3fb950' : '#f85149')
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: { display: false },
+        annotation: { annotations: { line50: { type: 'line', yMin: 50, yMax: 50, borderColor: '#8b949e', borderDash: [4,4], borderWidth: 1 } } }
+      },
+      scales: {
+        y: { grid: { color: '#30363d' }, title: { display: true, text: 'PMI' } },
+        x: { grid: { color: '#30363d' } }
+      }
+    }
+  });
+}
+
+// ========== INITIALIZATION ==========
+document.addEventListener('DOMContentLoaded', async () => {
+  renderOverviewCharts();
+  calculateCompositeScore();
+  await initLiveData();
+});
+</script>
+</body>
+</html>
